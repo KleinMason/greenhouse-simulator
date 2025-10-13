@@ -4,7 +4,7 @@
 A tick-based greenhouse simulation system with web interface for monitoring and controlling plant growth, soil moisture, and automated/manual watering systems.
 
 ## Core Requirements
-- **Simulation**: Tick-based (1 tick = 15 minutes real-time, configurable)
+- **Simulation**: Tick-based (1 tick = 5 seconds real-time, configurable)
 - **Plants**: 3-5 plants, different types with varying water needs
 - **Plant Properties**: Soil saturation, health, growth stage, can die
 - **Sensors**: Real-time readings, shared per plant-type section, exact readings
@@ -86,7 +86,7 @@ type WateringSchedule struct {
 Central coordinator that manages the tick-based simulation.
 
 Key responsibilities:
-- Manage simulation clock (tick every 15 minutes by default)
+- Manage simulation clock (tick every 5 seconds by default)
 - Coordinate updates across all systems
 - Emit events for state changes
 
@@ -183,7 +183,7 @@ Frontend (optional for MVP):
 Configuration file (YAML or JSON):
 ```yaml
 simulation:
-  tick_interval: 15m  # 15 minutes
+  tick_interval: 5s  # s seconds
   
 plant_types:
   - name: Tomato
