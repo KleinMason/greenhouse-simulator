@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -26,7 +27,7 @@ type Plant struct {
 	CreatedAt      time.Time
 }
 
-func OnTick(p *Plant) {
+func (p *Plant) OnTick() {
 	if !p.Alive {
 		return
 	}
@@ -42,6 +43,12 @@ func OnTick(p *Plant) {
 	}
 	updateGrowthStage(p)
 	updateSoilSaturation(p)
+}
+
+func (p *Plant) String() string {
+	return fmt.Sprintf("[%s] Health:%.2f Growth:%.2f Sat:%.2f Alive:%v",
+		p.ID, p.Health, p.GrowthStage, p.SoilSaturation, p.Alive)
+
 }
 
 func outOfOptimalSaturationRange(p *Plant) bool {
