@@ -12,6 +12,7 @@ type Simulator interface {
 	Pause()
 	Resume()
 	Stop()
+	AddPlant(p *models.Plant)
 }
 
 type simulator struct {
@@ -22,7 +23,8 @@ type simulator struct {
 	tickInterval time.Duration
 	currentTick  int
 	isPaused     bool
-	mu           sync.Mutex
+	mu           sync.RWMutex
+	plants       []*models.Plant
 }
 
 func NewSimulator(tickInterval time.Duration) Simulator {
@@ -38,11 +40,18 @@ func NewSimulator(tickInterval time.Duration) Simulator {
 }
 
 func (s *simulator) Start() {
+	log.Println("Starting...")
 	for {
 		select {
 		case <-s.ticker.C:
-			log.Print("-------------------------")
+			log.Print("\n---------------------------------------------------------------------------\n")
 			log.Printf("Tick %d\n", s.currentTick)
+			s.mu.RLock()
+			for _, plant := range s.plants {
+				plant.OnTick()
+				log.Println(plant)
+			}
+			s.mu.RUnlock()
 
 			s.currentTick++
 		case <-s.pause:
@@ -87,12 +96,13 @@ func (s *simulator) Stop() {
 }
 
 func (s *simulator) IsPaused() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.isPaused
 }
 
-func testPlants() []models.Plant {
-	// TODO: working here
-	return nil
+func (s *simulator) AddPlant(p *models.Plant) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.plants = append(s.plants, p)
 }
