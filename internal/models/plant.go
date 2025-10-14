@@ -27,6 +27,9 @@ type Plant struct {
 	CreatedAt      time.Time
 }
 
+const GROWTH_SLOW_FACTOR = 1.35
+const GROWTH_OPTIMAL_FACTOR = 1.25
+
 func (p *Plant) OnTick() {
 	if !p.Alive {
 		return
@@ -65,16 +68,17 @@ func enhanceHealth(p *Plant) {
 
 func updateGrowthStage(p *Plant) {
 	if p.Health < 0.3 {
-		return
+		return // no growth
 	}
-	growthRate := p.Type.BaseGrowthRate
+
+	growthRate := p.Type.BaseGrowthRate // start with base rate
 	if p.Health < 0.5 {
-		growthRate /= 1.35
+		growthRate /= GROWTH_SLOW_FACTOR // SLOWER growth
 	}
 	if math.Abs(p.SoilSaturation-p.Type.OptimalSaturation) < 0.15 {
-		growthRate *= 1.25
+		growthRate *= GROWTH_OPTIMAL_FACTOR // BONUS growth (near optimal)
 	}
-	p.GrowthStage = math.Min(p.GrowthStage+growthRate, 1)
+	p.GrowthStage = math.Min(p.GrowthStage+growthRate, 1) // Cap at 1.0
 }
 
 func updateSoilSaturation(p *Plant) {
