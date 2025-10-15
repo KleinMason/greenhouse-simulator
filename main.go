@@ -56,24 +56,27 @@ func getTestPlants() []models.Plant {
 		HealthEnhancementRate: 0.04,
 	}
 
-	return []models.Plant{
-		{
-			ID:             "tomato-1",
-			Type:           tomato,
-			SoilSaturation: 0.6,
-			Health:         1.0,
-			GrowthStage:    0.0,
-			Alive:          true,
-			CreatedAt:      time.Now(),
-		},
-		{
-			ID:             "lettuce-1",
-			Type:           lettuce,
-			SoilSaturation: 0.7,
-			Health:         1.0,
-			GrowthStage:    0.0,
-			Alive:          true,
-			CreatedAt:      time.Now(),
-		},
+	var plants []models.Plant
+
+	tomatoPlant1, err := models.NewPlant("tomato-1", tomato, "section-A", 0.5)
+	if err != nil {
+		log.Printf("Error creating tomato plant: %v", err)
+	} else {
+		plants = append(plants, *tomatoPlant1)
 	}
+	tomatoPlant2, err := models.NewPlant("tomato-1", tomato, "section-A", 0.3)
+	if err != nil {
+		log.Printf("Error creating tomato plant: %v", err)
+	} else {
+		plants = append(plants, *tomatoPlant2)
+	}
+
+	lettucePlant1, err := models.NewPlant("lettuce-1", lettuce, "section-B", 0.6)
+	if err != nil {
+		log.Printf("Error creating lettuce plant: %v", err)
+	} else {
+		plants = append(plants, *lettucePlant1)
+	}
+
+	return plants
 }
