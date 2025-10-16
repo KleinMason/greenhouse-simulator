@@ -3,7 +3,9 @@ package main
 import (
 	"greenhouse-simulator/internal/engine"
 	"greenhouse-simulator/internal/models"
+	"greenhouse-simulator/internal/sensors"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,27 +15,44 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	sim := engine.NewSimulator(4 * time.Second)
+	sensorMgr := sensors.NewSensorManager(sim)
+
+	sensor := &models.Sensor{
+		ID:        "sensor-1",
+		Type:      models.SoilMoisture,
+		SectionID: "section-B",
+	}
+	sensorMgr.AddSensor(sensor)
 
 	testPlants := getTestPlants()
 
 	for i := range testPlants {
-		sim.AddPlant(&testPlants[i])
+		err := sim.AddPlant(testPlants[i])
+		if err != nil {
+			slog.Warn(err.Error())
+		}
 	}
 
 	go sim.Start()
+
+	reading, err := sensorMgr.GetReading("sensor-1")
+	if err != nil {
+		slog.Error("failed to get reading for sensor", "error", err)
+	}
+	slog.Info("sensor reading", "SensorID", reading.SensorID, "Timestamp", reading.Timestamp, "Value", reading.Value)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutdown signal received, stopping simulator...")
+	slog.Info("Shutdown signal received, stopping simulator...")
 	sim.Stop()
 
 	time.Sleep(100 * time.Millisecond)
-	log.Println("Shutdown complete")
+	slog.Info("Shutdown complete")
 }
 
-func getTestPlants() []models.Plant {
+func getTestPlants() []*models.Plant {
 	tomato := models.PlantType{
 		Name:                  "Tomato",
 		OptimalSaturation:     0.6,
@@ -56,26 +75,26 @@ func getTestPlants() []models.Plant {
 		HealthEnhancementRate: 0.04,
 	}
 
-	var plants []models.Plant
+	var plants []*models.Plant
 
 	tomatoPlant1, err := models.NewPlant("tomato-1", tomato, "section-A", 0.5)
 	if err != nil {
-		log.Printf("Error creating tomato plant: %v", err)
+		slog.Error("Error creating tomato plant", "error", err)
 	} else {
-		plants = append(plants, *tomatoPlant1)
+		plants = append(plants, tomatoPlant1)
 	}
-	tomatoPlant2, err := models.NewPlant("tomato-1", tomato, "section-A", 0.3)
+	tomatoPlant2, err := models.NewPlant("tomato-2", tomato, "section-A", 0.3)
 	if err != nil {
-		log.Printf("Error creating tomato plant: %v", err)
+		slog.Error("Error creating tomato plant", "error", err)
 	} else {
-		plants = append(plants, *tomatoPlant2)
+		plants = append(plants, tomatoPlant2)
 	}
 
 	lettucePlant1, err := models.NewPlant("lettuce-1", lettuce, "section-B", 0.6)
 	if err != nil {
-		log.Printf("Error creating lettuce plant: %v", err)
+		slog.Error("Error creating lettuce plant", "error", err)
 	} else {
-		plants = append(plants, *lettucePlant1)
+		plants = append(plants, lettucePlant1)
 	}
 
 	return plants

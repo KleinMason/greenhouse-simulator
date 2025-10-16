@@ -4,6 +4,7 @@ import (
 	"errors"
 	"greenhouse-simulator/internal/models"
 	"sync"
+	"time"
 )
 
 // SensorManager manages all sensors in the greenhouse and provides
@@ -22,16 +23,29 @@ type SensorManager interface {
 type sensorManager struct {
 	sensorsBySection map[string][]*models.Sensor
 	sensorsByID      map[string]*models.Sensor
+	plantData        PlantDataSource
 	mu               sync.RWMutex
 }
 
-func NewSensorManager() SensorManager {
+// NewSensorManager creates and returns a new SensorManager instance.
+// The returned manager is initialized with empty maps for tracking sensors
+// by section and by ID, and is safe for concurrent use.
+func NewSensorManager(plantData PlantDataSource) SensorManager {
 	return &sensorManager{
 		sensorsBySection: make(map[string][]*models.Sensor),
 		sensorsByID:      map[string]*models.Sensor{},
+		plantData:        plantData,
 	}
 }
 
+// AddSensor registers a new sensor in the system and associates it with a plant section.
+// The sensor must have a valid ID and SectionID. Returns an error if:
+// - sensor is nil
+// - sensor ID is empty
+// - sensor section ID is empty
+// - a sensor with the same ID already exists
+//
+// This method is safe for concurrent use.
 func (s *sensorManager) AddSensor(sensor *models.Sensor) error {
 	if sensor == nil {
 		return errors.New("sensor cannot be nil")
@@ -56,8 +70,45 @@ func (s *sensorManager) AddSensor(sensor *models.Sensor) error {
 	return nil
 }
 
+// GetReading retrieves the current sensor reading for the specified sensor ID.
+// It calculates the reading value by averaging the soil saturation of all plants
+// in the sensor's associated section.
+//
+// Parameters:
+//   - sensorID: The unique identifier of the sensor to get a reading from
+//
+// Returns:
+//   - *models.SensorReading: A reading containing the sensor ID, current timestamp,
+//     and the calculated average soil saturation value
+//   - error: An error if the sensor ID is not found or if there are no plants
+//     in the sensor's section
+//
+// The method is safe for concurrent use as it acquires a read lock during execution.
+// The returned reading's Value field represents the average soil saturation percentage
+// across all plants in the sensor's section.
 func (s *sensorManager) GetReading(sensorID string) (*models.SensorReading, error) {
-	return nil, errors.New("not implemented")
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sensor := s.sensorsByID[sensorID]
+	if sensor == nil {
+		return nil, errors.New("no sensor found for the provided ID: " + sensorID)
+	}
+
+	plants := s.plantData.GetPlantsBySectionID(sensor.SectionID)
+	if len(plants) == 0 {
+		return nil, errors.New("no plants in section: " + sensor.SectionID)
+	}
+	total := 0.0
+	for _, plant := range plants {
+		total += plant.SoilSaturation
+	}
+	average := total / float64(len(plants))
+
+	return &models.SensorReading{
+		SensorID:  sensor.ID,
+		Timestamp: time.Now(),
+		Value:     average,
+	}, nil
 }
 
 func (s *sensorManager) GetSectionReadings(sectionID string) ([]*models.SensorReading, error) {

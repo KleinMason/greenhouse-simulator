@@ -1,8 +1,11 @@
 package engine
 
 import (
+	"errors"
 	"greenhouse-simulator/internal/models"
 	"log"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 )
@@ -15,34 +18,38 @@ type Simulator interface {
 	Pause()
 	Resume()
 	Stop()
-	AddPlant(p *models.Plant)
-	GetPlants() []*models.Plant
+	AddPlant(p *models.Plant) error
+	GetAllPlants() []*models.Plant
+	GetPlantsBySectionID(sectionID string) []*models.Plant
 	GetCurrentTick() int
 }
 
 type simulator struct {
-	ticker       *time.Ticker
-	pause        chan struct{}
-	resume       chan struct{}
-	stop         chan struct{}
-	tickInterval time.Duration
-	currentTick  int
-	isPaused     bool
-	mu           sync.RWMutex
-	plants       []*models.Plant
+	ticker            *time.Ticker
+	pause             chan struct{}
+	resume            chan struct{}
+	stop              chan struct{}
+	tickInterval      time.Duration
+	currentTick       int
+	isPaused          bool
+	mu                sync.RWMutex
+	plantsById        map[string]*models.Plant
+	plantsBySectionID map[string][]*models.Plant
 }
 
 // NewSimulator creates a new simulator instance with the specified tick interval.
 // The tick interval determines how frequently the simulation updates.
 func NewSimulator(tickInterval time.Duration) Simulator {
 	return &simulator{
-		ticker:       time.NewTicker(tickInterval),
-		pause:        make(chan struct{}),
-		resume:       make(chan struct{}),
-		stop:         make(chan struct{}),
-		tickInterval: tickInterval,
-		currentTick:  0,
-		isPaused:     false,
+		ticker:            time.NewTicker(tickInterval),
+		pause:             make(chan struct{}),
+		resume:            make(chan struct{}),
+		stop:              make(chan struct{}),
+		tickInterval:      tickInterval,
+		currentTick:       0,
+		isPaused:          false,
+		plantsById:        map[string]*models.Plant{},
+		plantsBySectionID: map[string][]*models.Plant{},
 	}
 }
 
@@ -57,7 +64,8 @@ func (s *simulator) Start() {
 			log.Print("\n---------------------------------------------------------------------------\n")
 			log.Printf("Tick %d\n", s.currentTick)
 			s.mu.RLock()
-			for _, plant := range s.plants {
+			plantSlice := slices.Collect(maps.Values(s.plantsById))
+			for _, plant := range plantSlice {
 				plant.OnTick()
 				log.Println(plant)
 			}
@@ -123,20 +131,38 @@ func (s *simulator) IsPaused() bool {
 // AddPlant adds a new plant to the greenhouse simulator.
 // The plant will be included in the simulation starting from the next tick.
 // This method is safe for concurrent use.
-func (s *simulator) AddPlant(p *models.Plant) {
+func (s *simulator) AddPlant(p *models.Plant) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.plants = append(s.plants, p)
+	exists := s.plantsById[p.ID]
+	if exists != nil {
+		return errors.New("plant with ID already added to simulator: " + p.ID)
+	}
+	s.plantsById[p.ID] = p
+	s.plantsBySectionID[p.SectionID] = append(s.plantsBySectionID[p.SectionID], p)
+	return nil
 }
 
 // GetPlants returns a snapshot of all plants in the greenhouse.
 // The returned slice is a copy and safe to iterate, but the plants
 // themselves are shared with the simulator.
-func (s *simulator) GetPlants() []*models.Plant {
+func (s *simulator) GetAllPlants() []*models.Plant {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	plantCopy := make([]*models.Plant, len(s.plants))
-	copy(plantCopy, s.plants)
+	plantCopy := make([]*models.Plant, len(s.plantsById))
+	copy(plantCopy, slices.Collect(maps.Values(s.plantsById)))
+	return plantCopy
+}
+
+// GetPlantsBySectionID returns a snapshot of all plants in the specified greenhouse section.
+// The returned slice is a copy and safe to iterate, but the plants themselves are shared with the simulator.
+// This method is safe for concurrent use.
+func (s *simulator) GetPlantsBySectionID(sectionID string) []*models.Plant {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sectionPlants := s.plantsBySectionID[sectionID]
+	plantCopy := make([]*models.Plant, len(sectionPlants))
+	copy(plantCopy, sectionPlants)
 	return plantCopy
 }
 
